@@ -3,39 +3,56 @@ name: Deploy Windows Service
 on:
   push:
     branches:
-      - main  # Change this based on your branch strategy
-  workflow_dispatch:  # Allows manual triggering
+      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: windows-latest
+    runs-on: self-hosted  # Ensure self-hosted runner is running
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Download and Extract Deployment Package
-        run: |
-          echo "Downloading and extracting package..."
-          mkdir -p C:\Deploy
-          # Replace this with actual package download logic if needed
-          # e.g., curl, Invoke-WebRequest, GitHub Artifacts, etc.
-
-      - name: Install/Update Windows Service
+      - name: Download and Extract NSSM
         shell: powershell
         run: |
+          $nssmUrl = "https://nssm.cc/release/nssm-2.24.zip"
+          $nssmZip = "C:\nssm.zip"
+          $nssmDir = "C:\nssm"
+
+          Write-Host "Downloading NSSM..."
+          Invoke-WebRequest -Uri $nssmUrl -OutFile $nssmZip
+
+          Write-Host "Extracting NSSM..."
+          Expand-Archive -Path $nssmZip -DestinationPath $nssmDir -Force
+
+          # Verify NSSM exists
+          $nssmExe = Get-ChildItem -Path "$nssmDir\**\nssm.exe" -Recurse | Select-Object -ExpandProperty FullName
+          if (-Not $nssmExe) {
+            Write-Host "ERROR: NSSM executable not found!"
+            exit 1
+          }
+
+          Write-Host "NSSM installed at: $nssmExe"
+          echo "NSSM_PATH=$nssmExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+
+      - name: Install Windows Service with NSSM
+        shell: powershell
+        run: |
+          $nssm = "${{ env.NSSM_PATH }}"
           $serviceName = "SampleWindowsService"
           $servicePath = "C:\Deploy\sample-package.exe"
 
-          if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
-            Write-Host "Stopping existing service..."
-            Stop-Service -Name $serviceName -Force
-            sc.exe delete $serviceName
+          if (Test-Path $servicePath) {
+            Write-Host "Installing Windows Service..."
+            & $nssm install $serviceName $servicePath
+            & $nssm set $serviceName Start SERVICE_AUTO_START
+            & $nssm start $serviceName
+          } else {
+            Write-Host "ERROR: Service executable not found!"
+            exit 1
           }
-
-          Write-Host "Creating and starting the Windows Service..."
-          sc.exe create $serviceName binPath= $servicePath start= auto
-          Start-Service -Name $serviceName
 
       - name: Verify Service Status
         shell: powershell
