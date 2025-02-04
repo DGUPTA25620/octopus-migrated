@@ -21,6 +21,11 @@ jobs:
           # Replace this with actual package download logic if needed
           # e.g., curl, Invoke-WebRequest, GitHub Artifacts, etc.
 
+      - name: Elevate Permissions
+        shell: powershell
+        run: |
+            Start-Process powershell -ArgumentList '-Command "whoami; Start-Process -Verb runAs"' -Wait
+
       - name: Install/Update Windows Service
         shell: powershell
         run: |
@@ -41,3 +46,4 @@ jobs:
         shell: powershell
         run: |
           Get-Service -Name "SampleWindowsService"
+
