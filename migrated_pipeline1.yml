@@ -1,0 +1,15 @@
+name: Migrated Octopus Deployment
+'on':
+  push:
+    branches:
+    - main
+  workflow_dispatch: {}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+    - name: Deploy a Windows Service
+      run: ''
+      shell: sh
